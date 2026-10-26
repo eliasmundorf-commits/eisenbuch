@@ -1,0 +1,105 @@
+{
+  "example": false,
+  "program": {
+    "start": "2026-10-26",
+    "weeks": 8,
+    "phases": [
+      { "from": 1, "to": 2, "title": "Technik und Einstieg", "text": "Bei den meisten Übungen 2–3 Sätze. Leichte Gewichte, saubere Wiederholungen, keine Sätze bis zum Muskelversagen. Swings und Cleans nur mit sicherer Technik." },
+      { "from": 3, "to": 4, "title": "Volumen festigen", "text": "Arbeite dich auf die angegebenen Sätze hoch. Ergänze Wiederholungen, solange Technik und Bewegungstempo kontrolliert bleiben." },
+      { "from": 5, "to": 6, "title": "Gezielt steigern", "text": "Erreichst du bei allen Sätzen das obere Ende des Wiederholungsbereichs mit etwa 2–3 Wiederholungen Reserve, erhöhe das Gewicht um die kleinste verfügbare Stufe und starte wieder am unteren Ende." },
+      { "from": 7, "to": 7, "title": "Stabile Belastung", "hold": true, "text": "Halte die erreichten Gewichte und verbessere die Bewegungsqualität. Bei Swings und Cleans zählen Explosivität und Kontrolle, nicht eine immer schwerere Kettlebell." },
+      { "from": 8, "to": 8, "title": "Entlastungswoche", "deload": true, "text": "Reduziere die Satzzahl um etwa ein Drittel bis die Hälfte. Nutze die Woche zur Erholung und prüfe, welche Gewichte und Übungen du künftig steigern kannst." }
+    ]
+  },
+  "rules": [
+    "Gewichte: Die letzten Wiederholungen sollen fordernd, aber technisch sauber sein. Kettlebell-Gewichte nach Technik wählen, nicht nach einem festen kg-Ziel.",
+    "Pausen sind Richtwerte. Wenn du noch deutlich außer Atem bist oder die Technik leidet, pausiere länger.",
+    "Swings und Cleans sind Technikübungen, keine Ausdauer-Challenge. Beende den Satz, sobald die Bewegung unsauber wird.",
+    "Beweglichkeit: Nach dem Training bei Bedarf 5 Minuten für Hüfte, Sprunggelenke und Brustwirbelsäule.",
+    "Sind die Beine am Samstag vom Freitag noch schwer, nimm beim Cardio lieber das Rad oder verkürze die Einheit.",
+    "In den ersten 4 Wochen keine harten Sprintintervalle oder intensiven Kettlebell-Finisher.",
+    "Halte den Plan mindestens 8 Wochen weitgehend konstant. Fortschritt kommt durch bessere Technik und kontrolliert höhere Belastung."
+  ],
+  "days": [
+    {
+      "id": "fb-a", "name": "Full Body A", "kind": "kraft", "weekday": 0,
+      "focus": "Kraftbasis und Explosivität", "duration": "50–60 Min.",
+      "note": "Schwerpunkt: Beine, Hüfte, Drücken und Ziehen.",
+      "exercises": [
+        { "id": "kb-swing", "name": "Kettlebell Swing", "sets": 3, "repsMin": 10, "repsMax": 10, "unit": "Wdh", "load": "kg", "perSide": false, "restSec": 60, "restMax": 90, "step": 4,
+          "note": "Technik zuerst. Explosive Hüftstreckung, hintere Kette. Hüftknick zunächst mit leichter Kettlebell lernen.",
+          "alt": "Kettlebell Deadlift, 3 × 10." },
+        { "id": "goblet", "name": "Goblet Squat", "sets": 3, "repsMin": 8, "repsMax": 10, "unit": "Wdh", "load": "kg", "perSide": false, "restSec": 90, "restMax": null, "step": 4,
+          "note": "Kettlebell vor der Brust. Kontrollierte Bewegung, stabiler Rumpf." },
+        { "id": "kh-bank", "name": "Kurzhantel-Bankdrücken", "sets": 3, "repsMin": 8, "repsMax": 10, "unit": "Wdh", "load": "kg", "perSide": false, "restSec": 90, "restMax": 120, "step": 2,
+          "note": "Gewicht pro Hand eintragen. Brust, Schultern, Trizeps." },
+        { "id": "kb-row", "name": "Einarmiges Kettlebell-Rudern", "sets": 3, "repsMin": 10, "repsMax": 10, "unit": "Wdh", "load": "kg", "perSide": true, "restSec": 60, "restMax": 90, "step": 4,
+          "note": "Ellenbogen zur Hüfte ziehen, Oberkörper nicht verdrehen." },
+        { "id": "farmer", "name": "Farmer's Carry", "sets": 3, "repsMin": 30, "repsMax": 40, "unit": "m", "load": "kg", "perSide": false, "restSec": 60, "restMax": null, "step": 4,
+          "note": "Zwei Kettlebells oder Kurzhanteln, Gewicht pro Hand. Griffkraft, Rumpf, Körperkontrolle." }
+      ]
+    },
+    {
+      "id": "cardio-1", "name": "Cardio 1", "kind": "cardio", "weekday": 1,
+      "focus": "Grundlagenausdauer", "duration": "30–40 Min.",
+      "note": "Laufen oder Radfahren in einem Tempo, in dem du dich noch in ganzen Sätzen unterhalten kannst. Baut Ausdauer auf, ohne das Krafttraining zu stark zu belasten.",
+      "exercises": [
+        { "id": "ga-lauf", "name": "Lockerer Lauf oder Rad", "sets": 1, "repsMin": 30, "repsMax": 40, "unit": "Min", "load": "km", "perSide": false, "restSec": 60, "restMax": null, "step": 1,
+          "note": "Minuten und optional Kilometer eintragen. Laufen oder Rad in den Notizen festhalten." }
+      ]
+    },
+    {
+      "id": "fb-b", "name": "Full Body B", "kind": "kraft", "weekday": 2,
+      "focus": "Einseitige Kraft, Oberkörper und Stabilität", "duration": "50–60 Min.",
+      "note": "Schwerpunkt: Gleichgewicht, Beine, Schultern und Rumpf.",
+      "exercises": [
+        { "id": "rev-lunge", "name": "Reverse Lunge mit Kurzhanteln", "sets": 3, "repsMin": 8, "repsMax": 8, "unit": "Wdh", "load": "kg", "perSide": true, "restSec": 90, "restMax": null, "step": 2,
+          "note": "Einseitige Beinkraft und Kontrolle. Erst mit Körpergewicht (0 kg), dann mit Zusatzgewicht, wenn du stabil bleibst." },
+        { "id": "kb-rdl", "name": "Kettlebell Romanian Deadlift", "sets": 3, "repsMin": 10, "repsMax": 10, "unit": "Wdh", "load": "kg", "perSide": false, "restSec": 90, "restMax": null, "step": 4,
+          "note": "Hüfte nach hinten schieben, Gewichte nah am Körper. Dehnung hinten im Oberschenkel spüren." },
+        { "id": "hk-press", "name": "Halb kniender Kettlebell Overhead Press", "sets": 3, "repsMin": 6, "repsMax": 8, "unit": "Wdh", "load": "kg", "perSide": true, "restSec": 60, "restMax": 90, "step": 2,
+          "note": "Kontrolliert über Kopf drücken, nicht ins Hohlkreuz ausweichen.",
+          "alt": "Zunächst mit einer Kurzhantel üben." },
+        { "id": "latzug", "name": "Latzug", "sets": 3, "repsMin": 8, "repsMax": 12, "unit": "Wdh", "load": "kg", "perSide": false, "restSec": 90, "restMax": null, "step": 2.5,
+          "note": "Vertikale Zugbewegung für Rücken und Arme." },
+        { "id": "pallof", "name": "Pallof Press am Kabelzug", "sets": 3, "repsMin": 10, "repsMax": 10, "unit": "Wdh", "load": "kg", "perSide": true, "restSec": 45, "restMax": 60, "step": 2.5,
+          "note": "Oberkörper ruhig halten, Kabel nach vorne drücken. Anti-Rotation." }
+      ]
+    },
+    {
+      "id": "erholung", "name": "Erholung", "kind": "erholung", "weekday": 3,
+      "focus": "Aktive Regeneration", "duration": "10–15 Min.",
+      "note": "Spaziergang oder 10–15 Minuten Mobility für Hüfte, Sprunggelenke und Brustwirbelsäule.",
+      "exercises": [
+        { "id": "mobility", "name": "Spaziergang oder Mobility", "sets": 1, "repsMin": 10, "repsMax": 15, "unit": "Min", "load": "none", "perSide": false, "restSec": 60, "restMax": null, "step": 1, "note": "" }
+      ]
+    },
+    {
+      "id": "fb-c", "name": "Full Body C", "kind": "kraft", "weekday": 4,
+      "focus": "Ganzkörper, Power und Conditioning", "duration": "45–60 Min.",
+      "note": "Schwerpunkt: Kraft, Power und kontrollierte Belastbarkeit.",
+      "exercises": [
+        { "id": "kb-clean", "name": "Kettlebell Clean zur Rack-Position", "sets": 3, "repsMin": 5, "repsMax": 5, "unit": "Wdh", "load": "kg", "perSide": true, "restSec": 60, "restMax": 90, "step": 4,
+          "note": "Erst den Clean ohne anschließendes Drücken üben. Die Kettlebell soll kontrolliert in die Rack-Position kommen, nicht auf den Unterarm schlagen.",
+          "alt": "Kettlebell Deadlift, 3 × 10." },
+        { "id": "trapbar", "name": "Trap-Bar Deadlift", "sets": 3, "repsMin": 5, "repsMax": 5, "unit": "Wdh", "load": "kg", "perSide": false, "restSec": 120, "restMax": null, "step": 5,
+          "note": "Moderates Gewicht. Jeden Satz mit sauberer Technik und etwas Reserve beenden." },
+        { "id": "liegestuetz", "name": "Liegestütze", "sets": 3, "repsMin": 8, "repsMax": 15, "unit": "Wdh", "load": "none", "perSide": false, "restSec": 60, "restMax": 90, "step": 1,
+          "note": "Körper und Rumpf stabil. Wenn 15 Wiederholungen leicht sind, die Variante schrittweise erschweren (Variante in den Notizen festhalten)." },
+        { "id": "kabelrudern", "name": "Sitzendes Kabelrudern", "sets": 3, "repsMin": 10, "repsMax": 12, "unit": "Wdh", "load": "kg", "perSide": false, "restSec": 75, "restMax": 90, "step": 2.5,
+          "note": "Kontrolliert ziehen, kein Schwung aus dem Oberkörper." },
+        { "id": "suitcase", "name": "Suitcase Carry", "sets": 3, "repsMin": 30, "repsMax": 30, "unit": "m", "load": "kg", "perSide": true, "restSec": 45, "restMax": 60, "step": 4,
+          "note": "Eine Kettlebell nur auf einer Seite. Aufrecht bleiben, nicht zur Last kippen." }
+      ]
+    },
+    {
+      "id": "cardio-2", "name": "Cardio 2", "kind": "cardio", "weekday": 5,
+      "focus": "Längere Ausdauereinheit", "duration": "40–60 Min.",
+      "note": "Radfahren, lockeres Laufen oder eine andere Ausdaueraktivität, überwiegend moderat. Wenn du müde bist, Dauer oder Intensität reduzieren.",
+      "exercises": [
+        { "id": "ga-lang", "name": "Rad oder lockerer Lauf", "sets": 1, "repsMin": 40, "repsMax": 60, "unit": "Min", "load": "km", "perSide": false, "restSec": 60, "restMax": null, "step": 1,
+          "note": "Minuten und optional Kilometer eintragen." }
+      ]
+    }
+  ]
+}
