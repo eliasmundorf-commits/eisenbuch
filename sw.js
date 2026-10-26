@@ -1,5 +1,5 @@
 // Offline support: app shell is cached; the page is fetched fresh when online.
-const CACHE = "eisenbuch-286fe48679";
+const CACHE = "eisenbuch-05d2c6e379";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => {

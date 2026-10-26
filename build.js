@@ -7,7 +7,8 @@ const crypto = require("crypto");
 const root = __dirname;
 const plan = JSON.parse(fs.readFileSync(path.join(root, "src/plan.json"), "utf8"));
 const app = fs.readFileSync(path.join(root, "src/app.html"), "utf8")
-  .replace("/*PLAN*/null", () => JSON.stringify(plan));
+  .replace("/*PLAN*/null", () => JSON.stringify(plan))
+  .replace("/*FIGURES*/", () => fs.readFileSync(path.join(root, "src/figures.js"), "utf8"));
 
 // standalone preview without the PWA head (used for the claude.ai preview)
 fs.mkdirSync(path.join(root, "dist"), { recursive: true });

@@ -184,6 +184,36 @@ button.li:active { background: var(--surface-2); }
 .back { border: 0; background: none; color: var(--accent); font-size: 17px; font-weight: 500; padding: 4px 0; display: inline-flex; align-items: center; gap: 2px; }
 .confirm { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 8px 14px; font-size: 14px; color: var(--fg-2); flex-wrap: wrap; }
 
+/* technique panel + figures */
+.tech { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; border: 0; background: none; padding: 0; text-align: left; color: var(--fg-3); font-size: 14px; width: 100%; }
+.tech .tx { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tech.open .tx { -webkit-line-clamp: unset; color: var(--fg-2); }
+.tech .chev { color: var(--fg-3); transition: transform .2s; }
+.tech.open .chev { transform: rotate(90deg); }
+.fig { display: block; background: var(--surface-2); border-radius: 12px; }
+.fig.mini { width: 56px; height: 43px; border-radius: 10px; }
+.fig.big { width: 100%; height: auto; max-height: 260px; }
+.fig .near, .fig .body { stroke: var(--accent); stroke-linecap: round; }
+.fig .far { stroke: var(--accent); stroke-linecap: round; opacity: .38; }
+.fig .headc { fill: var(--accent); }
+.fig .eq circle, .fig .eq rect, .fig rect.eq { fill: var(--fg); }
+.fig .eq .eq-h { fill: none; stroke: var(--fg); stroke-width: 2.5; }
+.fig .eq .plate { fill: var(--surface-3); stroke: var(--fg); stroke-width: 3; }
+.fig .prop rect { fill: var(--surface-3); }
+.fig .ground { stroke: var(--surface-3); stroke-width: 2; }
+.fig .cable { stroke: var(--fg-2); stroke-width: 1.5; }
+.fig .pulley { fill: var(--fg-2); }
+.techp { display: grid; gap: 10px; }
+.techp .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.figcap { font-size: 12px; color: var(--fg-3); text-align: center; margin-top: -4px; }
+a.link { text-decoration: none; }
+.addex { width: 100%; border: 1.5px dashed var(--surface-3); background: transparent; color: var(--accent); border-radius: var(--r); padding: 16px; font-size: 16px; font-weight: 700; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { border: 0; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 700; background: var(--surface); color: var(--fg-2); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.seg .lbl { font-size: 13px; color: var(--fg-3); align-self: center; }
+.extra-tag { font-size: 11px; font-weight: 700; color: var(--fg-3); background: var(--surface-2); border-radius: 6px; padding: 2px 6px; margin-left: 6px; vertical-align: middle; }
+
 /* bottom sheet */
 .sheet-bg { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.6); }
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--surface); border-radius: 22px 22px 0 0; max-height: 82vh; overflow-y: auto; padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
@@ -248,8 +278,148 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
 <input type="file" id="import-file" accept="application/json,.json" hidden>
 
 <script>
+// Animated exercise figures: a side-view body driven by joint angles, interpolated between two key poses.
+// Angles in degrees. Arms/legs in "hip" mode: 0 = straight down, +90 = pointing forward (right), 180 = up.
+// "foot" mode keeps the feet planted: knee = forward lean of the shin, thigh = how far the hip sits back.
+const FIG = (() => {
+  const L = { thigh: 40, shin: 38, torso: 46, upper: 27, fore: 25, neck: 11, head: 8.5, foot: 13 };
+  const G = 158; // ground line
+  const rad = d => d * Math.PI / 180;
+  const add = (p, len, ang) => [p[0] + len * Math.sin(rad(ang)), p[1] + len * Math.cos(rad(ang))];   // ang from straight down, + forward
+  const up = (p, len, ang) => [p[0] + len * Math.sin(rad(ang)), p[1] - len * Math.cos(rad(ang))];    // ang from straight up, + forward
+
+  function solve(P) {
+    const J = {};
+    if (P.mode === "foot") {
+      J.an = [P.x, G - 3]; J.toe = [P.x + L.foot, G - 2];
+      J.kn = up(J.an, L.shin, P.knee || 0);
+      J.hip = up(J.kn, L.thigh, -(P.hipBack || 0));
+      J.kn2 = [J.kn[0] - 3, J.kn[1]]; J.an2 = [J.an[0] - 3, J.an[1]]; J.toe2 = [J.toe[0] - 3, J.toe[1]];
+    } else {
+      J.hip = [P.x, P.y];
+      J.kn = add(J.hip, L.thigh, P.th ?? 0); J.an = add(J.kn, L.shin, P.sh ?? 0);
+      J.kn2 = add(J.hip, L.thigh, P.th2 ?? P.th ?? 0); J.an2 = add(J.kn2, L.shin, P.sh2 ?? P.sh ?? 0);
+      const fa = P.footAng ?? 90, fa2 = P.footAng2 ?? P.footAng ?? 90;
+      J.toe = add(J.an, L.foot, fa); J.toe2 = add(J.an2, L.foot, fa2);
+    }
+    const t = P.torso || 0;
+    J.sh = up(J.hip, L.torso, t);
+    J.neck = up(J.sh, 4, t);
+    J.head = up(J.sh, L.neck + L.head - 2, t + (P.headTilt || 0));
+    J.el = add(J.sh, L.upper, P.a ?? 0); J.ha = add(J.el, L.fore, P.b ?? P.a ?? 0);
+    J.el2 = add(J.sh, L.upper, P.a2 ?? P.a ?? 0); J.ha2 = add(J.el2, L.fore, P.b2 ?? P.b ?? P.a2 ?? P.a ?? 0);
+    J.foreAng = P.b ?? P.a ?? 0; J.foreAng2 = P.b2 ?? P.b ?? P.a2 ?? P.a ?? 0;
+    return J;
+  }
+  const lerp = (a, b, k) => a + (b - a) * k;
+  function mix(A, B, k) {
+    const o = { mode: A.mode };
+    for (const key of new Set([...Object.keys(A), ...Object.keys(B)])) {
+      if (key === "mode") continue;
+      const va = A[key] ?? B[key], vb = B[key] ?? A[key];
+      o[key] = typeof va === "number" ? lerp(va, vb, k) : (k < .5 ? va : vb);
+    }
+    return o;
+  }
+  const seg = (p, q, cls, w) => `<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${q[0].toFixed(1)}" y2="${q[1].toFixed(1)}" class="${cls}" stroke-width="${w}"/>`;
+  function kb(p, dirAng = 0, scale = 1) {
+    // handle at the hand, bell continues along the forearm direction (or hangs)
+    const c = add(p, 11 * scale, dirAng);
+    return `<g class="eq"><circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${(8.5 * scale).toFixed(1)}"/><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(4 * scale).toFixed(1)}" class="eq-h"/></g>`;
+  }
+  function db(p) { return `<g class="eq"><rect x="${(p[0] - 9).toFixed(1)}" y="${(p[1] - 3).toFixed(1)}" width="18" height="6" rx="2"/><rect x="${(p[0] - 11).toFixed(1)}" y="${(p[1] - 6).toFixed(1)}" width="6" height="12" rx="2"/><rect x="${(p[0] + 5).toFixed(1)}" y="${(p[1] - 6).toFixed(1)}" width="6" height="12" rx="2"/></g>`; }
+  function draw(def, P) {
+    const J = solve(P);
+    const eq = def.equip || [];
+    let back = "", front = "";
+    // static props behind the body
+    for (const e of eq) {
+      if (e === "bench") back += `<g class="prop"><rect x="44" y="${(P.y + 5).toFixed(1)}" width="104" height="9" rx="3"/><rect x="58" y="${(P.y + 14).toFixed(1)}" width="7" height="${(G - P.y - 14).toFixed(1)}"/><rect x="128" y="${(P.y + 14).toFixed(1)}" width="7" height="${(G - P.y - 14).toFixed(1)}"/></g>`;
+      if (e === "seat") back += `<g class="prop"><rect x="${(P.x - 22).toFixed(1)}" y="${(P.y + 6).toFixed(1)}" width="40" height="8" rx="3"/><rect x="${(P.x - 6).toFixed(1)}" y="${(P.y + 14).toFixed(1)}" width="7" height="${(G - P.y - 14).toFixed(1)}"/></g>`;
+      if (e === "rowbench") back += `<g class="prop"><rect x="${(J.ha2[0] - 30).toFixed(1)}" y="${(J.ha2[1] + 2).toFixed(1)}" width="62" height="8" rx="3"/><rect x="${(J.ha2[0] - 4).toFixed(1)}" y="${(J.ha2[1] + 10).toFixed(1)}" width="7" height="${(G - J.ha2[1] - 10).toFixed(1)}"/></g>`;
+      if (e === "tower") back += `<g class="prop"><rect x="${def.tower[0]}" y="10" width="8" height="${G - 10}" rx="2"/></g>`;
+      if (e === "pad") back += `<g class="prop"><rect x="${(J.kn[0] - 8).toFixed(1)}" y="${(J.kn[1] - 12).toFixed(1)}" width="16" height="7" rx="3"/></g>`;
+      if (e === "mat") back += `<g class="prop"><rect x="20" y="${G - 4}" width="180" height="4" rx="2"/></g>`;
+    }
+    // far limbs (dimmer), torso, near limbs
+    let body = "";
+    body += seg(J.hip, J.kn2, "far", 9) + seg(J.kn2, J.an2, "far", 8) + seg(J.an2, J.toe2, "far", 6);
+    body += seg(J.sh, J.el2, "far", 7.5) + seg(J.el2, J.ha2, "far", 6.5);
+    body += seg(J.hip, J.sh, "body", 15);
+    body += `<circle cx="${J.head[0].toFixed(1)}" cy="${J.head[1].toFixed(1)}" r="${L.head}" class="headc"/>`;
+    body += seg(J.hip, J.kn, "near", 10) + seg(J.kn, J.an, "near", 9) + seg(J.an, J.toe, "near", 6.5);
+    let eqFar = "", eqNear = "";
+    for (const e of eq) {
+      if (e === "kb") eqNear += kb(J.ha, P.kbAng ?? 0);
+      if (e === "kb2") eqFar += kb(J.ha2, P.kbAng ?? 0, .95);
+      if (e === "kbFwd") eqNear += kb(J.ha, J.foreAng);
+      if (e === "kbRack") eqNear += kb(J.ha, (P.kbAng ?? 200));
+      if (e === "goblet") eqNear += `<g class="eq"><circle cx="${(J.ha[0] + 4).toFixed(1)}" cy="${(J.ha[1] + 9).toFixed(1)}" r="9"/></g>`;
+      if (e === "db") eqNear += db(J.ha);
+      if (e === "db2") eqFar += db(J.ha2);
+      if (e === "trap") { const y = J.ha[1]; eqNear += `<g class="eq"><rect x="${(J.ha[0] - 30).toFixed(1)}" y="${(y - 2).toFixed(1)}" width="60" height="4" rx="2"/><circle cx="${(J.ha[0] - 22).toFixed(1)}" cy="${y.toFixed(1)}" r="16" class="plate"/><circle cx="${(J.ha[0] + 22).toFixed(1)}" cy="${y.toFixed(1)}" r="16" class="plate"/></g>`; }
+      if (e === "cable") { const a = def.anchor; front += `<line x1="${a[0]}" y1="${a[1]}" x2="${J.ha[0].toFixed(1)}" y2="${J.ha[1].toFixed(1)}" class="cable"/><circle cx="${a[0]}" cy="${a[1]}" r="4" class="pulley"/>`; eqNear += `<rect x="${(J.ha[0] - 4).toFixed(1)}" y="${(J.ha[1] - 4).toFixed(1)}" width="8" height="8" rx="2" class="eq"/>`; }
+      if (e === "latbar") { const a = def.anchor; front += `<line x1="${a[0]}" y1="${a[1]}" x2="${J.ha[0].toFixed(1)}" y2="${(J.ha[1] - 2).toFixed(1)}" class="cable"/><circle cx="${a[0]}" cy="${a[1]}" r="4" class="pulley"/>`; eqNear += `<rect x="${(J.ha[0] - 22).toFixed(1)}" y="${(J.ha[1] - 2.5).toFixed(1)}" width="44" height="5" rx="2.5" class="eq"/>`; }
+    }
+    const arms = seg(J.sh, J.el, "near", 8.5) + seg(J.el, J.ha, "near", 7.5);
+    return `<line x1="8" y1="${G}" x2="212" y2="${G}" class="ground"/>${back}${front}${eqFar}${body}${arms}${eqNear}`;
+  }
+
+  // ---- the moves ----
+  const stand = { mode: "foot", x: 108, knee: 0, hipBack: 0, torso: 0, a: 0, b: 0 };
+  const walkA = { mode: "hip", x: 108, y: 79, th: 18, sh: 8, th2: -16, sh2: -2, torso: 0, a: 4, b: 4, a2: 4, b2: 4, footAng: 85, footAng2: 95 };
+  const walkB = { mode: "hip", x: 108, y: 79, th: -16, sh: -2, th2: 18, sh2: 8, torso: 0, a: 4, b: 4, a2: 4, b2: 4, footAng: 95, footAng2: 85 };
+  const D = {
+    swing: { label: "Kettlebell Swing", equip: ["kbFwd"], frames: [
+      { ...stand, x: 96, knee: 14, hipBack: 30, torso: 72, a: -28, b: -34, headTilt: -25 },
+      { ...stand, x: 96, torso: -4, a: 92, b: 92 }] },
+    kbdl: { label: "Kettlebell Deadlift", equip: ["kb"], frames: [
+      { ...stand, x: 100, knee: 22, hipBack: 48, torso: 58, a: 0, b: 0, headTilt: -20 },
+      { ...stand, x: 100 }] },
+    goblet: { label: "Goblet Squat", equip: ["goblet"], frames: [
+      { ...stand, x: 104, a: 22, b: 168 },
+      { ...stand, x: 104, knee: 38, hipBack: 92, torso: 34, a: 40, b: 186, headTilt: -24 }] },
+    rdl: { label: "Romanian Deadlift", equip: ["kb"], frames: [
+      { ...stand, x: 100 },
+      { ...stand, x: 100, knee: 10, hipBack: 26, torso: 74, a: 0, b: 0, headTilt: -24 }] },
+    bench: { label: "Kurzhantel-Bankdrücken", equip: ["bench", "db"], frames: [
+      { mode: "hip", x: 72, y: 104, th: -72, sh: -8, torso: 90, a: 30, b: 176, footAng: 90 },
+      { mode: "hip", x: 72, y: 104, th: -72, sh: -8, torso: 90, a: 180, b: 180, footAng: 90 }] },
+    row: { label: "Einarmiges Rudern", equip: ["rowbench", "kb"], frames: [
+      { ...stand, x: 88, knee: 14, hipBack: 30, torso: 72, a: 0, b: 0, a2: 48, b2: 40, headTilt: -20 },
+      { ...stand, x: 88, knee: 14, hipBack: 30, torso: 72, a: -72, b: 0, a2: 48, b2: 40, headTilt: -20 }] },
+    farmer: { label: "Farmer's Carry", equip: ["kb", "kb2"], walk: true, frames: [walkA, walkB] },
+    suitcase: { label: "Suitcase Carry", equip: ["kb"], walk: true, frames: [walkA, walkB] },
+    lunge: { label: "Reverse Lunge", equip: ["db"], frames: [
+      { mode: "hip", x: 104, y: 79, th: 0, sh: 0, th2: 0, sh2: 0, torso: 0, a: 0, b: 0, footAng: 90, footAng2: 90 },
+      { mode: "hip", x: 104, y: 118, th: 82, sh: -4, th2: -22, sh2: -82, torso: 6, a: 0, b: 0, footAng: 90, footAng2: 180 }] },
+    hkpress: { label: "Halb kniende Overhead Press", equip: ["kbRack"], frames: [
+      { mode: "hip", x: 100, y: 116, th: 0, sh: -90, th2: 88, sh2: 0, footAng: 180, footAng2: 90, torso: 0, a: 6, b: 148, kbAng: 262 },
+      { mode: "hip", x: 100, y: 116, th: 0, sh: -90, th2: 88, sh2: 0, footAng: 180, footAng2: 90, torso: 0, a: 178, b: 180, kbAng: 262 }] },
+    latpull: { label: "Latzug", equip: ["seat", "pad", "latbar"], anchor: [118, 8], frames: [
+      { mode: "hip", x: 100, y: 108, th: 88, sh: 4, torso: -8, a: 168, b: 172, footAng: 90 },
+      { mode: "hip", x: 100, y: 108, th: 88, sh: 4, torso: -14, a: 22, b: 168, footAng: 90 }] },
+    pallof: { label: "Pallof Press", equip: ["tower", "cable"], tower: 18, anchor: [22, 64], frames: [
+      { mode: "hip", x: 112, y: 80, th: 6, sh: 0, th2: -6, sh2: 0, torso: 0, a: 28, b: 128, footAng: 90 },
+      { mode: "hip", x: 112, y: 80, th: 6, sh: 0, th2: -6, sh2: 0, torso: 0, a: 90, b: 90, footAng: 90 }] },
+    clean: { label: "Kettlebell Clean", equip: ["kbRack"], frames: [
+      { ...stand, x: 98, knee: 18, hipBack: 40, torso: 56, a: -8, b: -8, kbAng: 0, headTilt: -20 },
+      { ...stand, x: 98, a: 6, b: 148, kbAng: 262 }] },
+    trapbar: { label: "Trap-Bar Deadlift", equip: ["trap"], frames: [
+      { ...stand, x: 104, knee: 30, hipBack: 62, torso: 44, a: 0, b: 0, headTilt: -16 },
+      { ...stand, x: 104 }] },
+    pushup: { label: "Liegestütze", equip: ["mat"], frames: [
+      { mode: "hip", x: 98, y: 106, th: -78, sh: -78, torso: 78, a: 4, b: 2, footAng: 0 },
+      { mode: "hip", x: 98, y: 132, th: -84, sh: -84, torso: 86, a: -64, b: 26, footAng: 0 }] },
+    cablerow: { label: "Sitzendes Kabelrudern", equip: ["cable"], anchor: [200, 132], frames: [
+      { mode: "hip", x: 78, y: 140, th: 84, sh: 62, torso: 16, a: 82, b: 86, footAng: 170 },
+      { mode: "hip", x: 78, y: 140, th: 84, sh: 62, torso: -4, a: -32, b: 82, footAng: 170 }] },
+  };
+  return { D, draw, mix };
+})();
+
 (() => {
-  const DEFAULT_PLAN = {"example":false,"program":{"start":"2026-10-26","weeks":8,"phases":[{"from":1,"to":2,"title":"Technik und Einstieg","text":"Bei den meisten Übungen 2–3 Sätze. Leichte Gewichte, saubere Wiederholungen, keine Sätze bis zum Muskelversagen. Swings und Cleans nur mit sicherer Technik."},{"from":3,"to":4,"title":"Volumen festigen","text":"Arbeite dich auf die angegebenen Sätze hoch. Ergänze Wiederholungen, solange Technik und Bewegungstempo kontrolliert bleiben."},{"from":5,"to":6,"title":"Gezielt steigern","text":"Erreichst du bei allen Sätzen das obere Ende des Wiederholungsbereichs mit etwa 2–3 Wiederholungen Reserve, erhöhe das Gewicht um die kleinste verfügbare Stufe und starte wieder am unteren Ende."},{"from":7,"to":7,"title":"Stabile Belastung","hold":true,"text":"Halte die erreichten Gewichte und verbessere die Bewegungsqualität. Bei Swings und Cleans zählen Explosivität und Kontrolle, nicht eine immer schwerere Kettlebell."},{"from":8,"to":8,"title":"Entlastungswoche","deload":true,"text":"Reduziere die Satzzahl um etwa ein Drittel bis die Hälfte. Nutze die Woche zur Erholung und prüfe, welche Gewichte und Übungen du künftig steigern kannst."}]},"rules":["Gewichte: Die letzten Wiederholungen sollen fordernd, aber technisch sauber sein. Kettlebell-Gewichte nach Technik wählen, nicht nach einem festen kg-Ziel.","Pausen sind Richtwerte. Wenn du noch deutlich außer Atem bist oder die Technik leidet, pausiere länger.","Swings und Cleans sind Technikübungen, keine Ausdauer-Challenge. Beende den Satz, sobald die Bewegung unsauber wird.","Beweglichkeit: Nach dem Training bei Bedarf 5 Minuten für Hüfte, Sprunggelenke und Brustwirbelsäule.","Sind die Beine am Samstag vom Freitag noch schwer, nimm beim Cardio lieber das Rad oder verkürze die Einheit.","In den ersten 4 Wochen keine harten Sprintintervalle oder intensiven Kettlebell-Finisher.","Halte den Plan mindestens 8 Wochen weitgehend konstant. Fortschritt kommt durch bessere Technik und kontrolliert höhere Belastung."],"days":[{"id":"fb-a","name":"Full Body A","kind":"kraft","weekday":0,"focus":"Kraftbasis und Explosivität","duration":"50–60 Min.","note":"Schwerpunkt: Beine, Hüfte, Drücken und Ziehen.","exercises":[{"id":"kb-swing","name":"Kettlebell Swing","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":60,"restMax":90,"step":4,"note":"Technik zuerst. Explosive Hüftstreckung, hintere Kette. Hüftknick zunächst mit leichter Kettlebell lernen.","alt":"Kettlebell Deadlift, 3 × 10."},{"id":"goblet","name":"Goblet Squat","sets":3,"repsMin":8,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":null,"step":4,"note":"Kettlebell vor der Brust. Kontrollierte Bewegung, stabiler Rumpf."},{"id":"kh-bank","name":"Kurzhantel-Bankdrücken","sets":3,"repsMin":8,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":120,"step":2,"note":"Gewicht pro Hand eintragen. Brust, Schultern, Trizeps."},{"id":"kb-row","name":"Einarmiges Kettlebell-Rudern","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":true,"restSec":60,"restMax":90,"step":4,"note":"Ellenbogen zur Hüfte ziehen, Oberkörper nicht verdrehen."},{"id":"farmer","name":"Farmer's Carry","sets":3,"repsMin":30,"repsMax":40,"unit":"m","load":"kg","perSide":false,"restSec":60,"restMax":null,"step":4,"note":"Zwei Kettlebells oder Kurzhanteln, Gewicht pro Hand. Griffkraft, Rumpf, Körperkontrolle."}]},{"id":"cardio-1","name":"Cardio 1","kind":"cardio","weekday":1,"focus":"Grundlagenausdauer","duration":"30–40 Min.","note":"Laufen oder Radfahren in einem Tempo, in dem du dich noch in ganzen Sätzen unterhalten kannst. Baut Ausdauer auf, ohne das Krafttraining zu stark zu belasten.","exercises":[{"id":"ga-lauf","name":"Lockerer Lauf oder Rad","sets":1,"repsMin":30,"repsMax":40,"unit":"Min","load":"km","perSide":false,"restSec":60,"restMax":null,"step":1,"note":"Minuten und optional Kilometer eintragen. Laufen oder Rad in den Notizen festhalten."}]},{"id":"fb-b","name":"Full Body B","kind":"kraft","weekday":2,"focus":"Einseitige Kraft, Oberkörper und Stabilität","duration":"50–60 Min.","note":"Schwerpunkt: Gleichgewicht, Beine, Schultern und Rumpf.","exercises":[{"id":"rev-lunge","name":"Reverse Lunge mit Kurzhanteln","sets":3,"repsMin":8,"repsMax":8,"unit":"Wdh","load":"kg","perSide":true,"restSec":90,"restMax":null,"step":2,"note":"Einseitige Beinkraft und Kontrolle. Erst mit Körpergewicht (0 kg), dann mit Zusatzgewicht, wenn du stabil bleibst."},{"id":"kb-rdl","name":"Kettlebell Romanian Deadlift","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":null,"step":4,"note":"Hüfte nach hinten schieben, Gewichte nah am Körper. Dehnung hinten im Oberschenkel spüren."},{"id":"hk-press","name":"Halb kniender Kettlebell Overhead Press","sets":3,"repsMin":6,"repsMax":8,"unit":"Wdh","load":"kg","perSide":true,"restSec":60,"restMax":90,"step":2,"note":"Kontrolliert über Kopf drücken, nicht ins Hohlkreuz ausweichen.","alt":"Zunächst mit einer Kurzhantel üben."},{"id":"latzug","name":"Latzug","sets":3,"repsMin":8,"repsMax":12,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":null,"step":2.5,"note":"Vertikale Zugbewegung für Rücken und Arme."},{"id":"pallof","name":"Pallof Press am Kabelzug","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":true,"restSec":45,"restMax":60,"step":2.5,"note":"Oberkörper ruhig halten, Kabel nach vorne drücken. Anti-Rotation."}]},{"id":"erholung","name":"Erholung","kind":"erholung","weekday":3,"focus":"Aktive Regeneration","duration":"10–15 Min.","note":"Spaziergang oder 10–15 Minuten Mobility für Hüfte, Sprunggelenke und Brustwirbelsäule.","exercises":[{"id":"mobility","name":"Spaziergang oder Mobility","sets":1,"repsMin":10,"repsMax":15,"unit":"Min","load":"none","perSide":false,"restSec":60,"restMax":null,"step":1,"note":""}]},{"id":"fb-c","name":"Full Body C","kind":"kraft","weekday":4,"focus":"Ganzkörper, Power und Conditioning","duration":"45–60 Min.","note":"Schwerpunkt: Kraft, Power und kontrollierte Belastbarkeit.","exercises":[{"id":"kb-clean","name":"Kettlebell Clean zur Rack-Position","sets":3,"repsMin":5,"repsMax":5,"unit":"Wdh","load":"kg","perSide":true,"restSec":60,"restMax":90,"step":4,"note":"Erst den Clean ohne anschließendes Drücken üben. Die Kettlebell soll kontrolliert in die Rack-Position kommen, nicht auf den Unterarm schlagen.","alt":"Kettlebell Deadlift, 3 × 10."},{"id":"trapbar","name":"Trap-Bar Deadlift","sets":3,"repsMin":5,"repsMax":5,"unit":"Wdh","load":"kg","perSide":false,"restSec":120,"restMax":null,"step":5,"note":"Moderates Gewicht. Jeden Satz mit sauberer Technik und etwas Reserve beenden."},{"id":"liegestuetz","name":"Liegestütze","sets":3,"repsMin":8,"repsMax":15,"unit":"Wdh","load":"none","perSide":false,"restSec":60,"restMax":90,"step":1,"note":"Körper und Rumpf stabil. Wenn 15 Wiederholungen leicht sind, die Variante schrittweise erschweren (Variante in den Notizen festhalten)."},{"id":"kabelrudern","name":"Sitzendes Kabelrudern","sets":3,"repsMin":10,"repsMax":12,"unit":"Wdh","load":"kg","perSide":false,"restSec":75,"restMax":90,"step":2.5,"note":"Kontrolliert ziehen, kein Schwung aus dem Oberkörper."},{"id":"suitcase","name":"Suitcase Carry","sets":3,"repsMin":30,"repsMax":30,"unit":"m","load":"kg","perSide":true,"restSec":45,"restMax":60,"step":4,"note":"Eine Kettlebell nur auf einer Seite. Aufrecht bleiben, nicht zur Last kippen."}]},{"id":"cardio-2","name":"Cardio 2","kind":"cardio","weekday":5,"focus":"Längere Ausdauereinheit","duration":"40–60 Min.","note":"Radfahren, lockeres Laufen oder eine andere Ausdaueraktivität, überwiegend moderat. Wenn du müde bist, Dauer oder Intensität reduzieren.","exercises":[{"id":"ga-lang","name":"Rad oder lockerer Lauf","sets":1,"repsMin":40,"repsMax":60,"unit":"Min","load":"km","perSide":false,"restSec":60,"restMax":null,"step":1,"note":"Minuten und optional Kilometer eintragen."}]}]};
+  const DEFAULT_PLAN = {"example":false,"program":{"start":"2026-10-26","weeks":8,"phases":[{"from":1,"to":2,"title":"Technik und Einstieg","text":"Bei den meisten Übungen 2–3 Sätze. Leichte Gewichte, saubere Wiederholungen, keine Sätze bis zum Muskelversagen. Swings und Cleans nur mit sicherer Technik."},{"from":3,"to":4,"title":"Volumen festigen","text":"Arbeite dich auf die angegebenen Sätze hoch. Ergänze Wiederholungen, solange Technik und Bewegungstempo kontrolliert bleiben."},{"from":5,"to":6,"title":"Gezielt steigern","text":"Erreichst du bei allen Sätzen das obere Ende des Wiederholungsbereichs mit etwa 2–3 Wiederholungen Reserve, erhöhe das Gewicht um die kleinste verfügbare Stufe und starte wieder am unteren Ende."},{"from":7,"to":7,"title":"Stabile Belastung","hold":true,"text":"Halte die erreichten Gewichte und verbessere die Bewegungsqualität. Bei Swings und Cleans zählen Explosivität und Kontrolle, nicht eine immer schwerere Kettlebell."},{"from":8,"to":8,"title":"Entlastungswoche","deload":true,"text":"Reduziere die Satzzahl um etwa ein Drittel bis die Hälfte. Nutze die Woche zur Erholung und prüfe, welche Gewichte und Übungen du künftig steigern kannst."}]},"rules":["Gewichte: Die letzten Wiederholungen sollen fordernd, aber technisch sauber sein. Kettlebell-Gewichte nach Technik wählen, nicht nach einem festen kg-Ziel.","Pausen sind Richtwerte. Wenn du noch deutlich außer Atem bist oder die Technik leidet, pausiere länger.","Swings und Cleans sind Technikübungen, keine Ausdauer-Challenge. Beende den Satz, sobald die Bewegung unsauber wird.","Beweglichkeit: Nach dem Training bei Bedarf 5 Minuten für Hüfte, Sprunggelenke und Brustwirbelsäule.","Sind die Beine am Samstag vom Freitag noch schwer, nimm beim Cardio lieber das Rad oder verkürze die Einheit.","In den ersten 4 Wochen keine harten Sprintintervalle oder intensiven Kettlebell-Finisher.","Halte den Plan mindestens 8 Wochen weitgehend konstant. Fortschritt kommt durch bessere Technik und kontrolliert höhere Belastung."],"days":[{"id":"fb-a","name":"Full Body A","kind":"kraft","weekday":0,"focus":"Kraftbasis und Explosivität","duration":"50–60 Min.","note":"Schwerpunkt: Beine, Hüfte, Drücken und Ziehen.","exercises":[{"id":"kb-swing","name":"Kettlebell Swing","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":60,"restMax":90,"step":4,"note":"Technik zuerst. Explosive Hüftstreckung, hintere Kette. Hüftknick zunächst mit leichter Kettlebell lernen.","alt":"Kettlebell Deadlift, 3 × 10.","anim":"swing","altAnim":"kbdl"},{"id":"goblet","name":"Goblet Squat","sets":3,"repsMin":8,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":null,"step":4,"note":"Kettlebell vor der Brust. Kontrollierte Bewegung, stabiler Rumpf.","anim":"goblet"},{"id":"kh-bank","name":"Kurzhantel-Bankdrücken","sets":3,"repsMin":8,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":120,"step":2,"note":"Gewicht pro Hand eintragen. Brust, Schultern, Trizeps.","anim":"bench"},{"id":"kb-row","name":"Einarmiges Kettlebell-Rudern","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":true,"restSec":60,"restMax":90,"step":4,"note":"Ellenbogen zur Hüfte ziehen, Oberkörper nicht verdrehen.","anim":"row"},{"id":"farmer","name":"Farmer's Carry","sets":3,"repsMin":30,"repsMax":40,"unit":"m","load":"kg","perSide":false,"restSec":60,"restMax":null,"step":4,"note":"Zwei Kettlebells oder Kurzhanteln, Gewicht pro Hand. Griffkraft, Rumpf, Körperkontrolle.","anim":"farmer"}]},{"id":"cardio-1","name":"Cardio 1","kind":"cardio","weekday":1,"focus":"Grundlagenausdauer","duration":"30–40 Min.","note":"Laufen oder Radfahren in einem Tempo, in dem du dich noch in ganzen Sätzen unterhalten kannst. Baut Ausdauer auf, ohne das Krafttraining zu stark zu belasten.","exercises":[{"id":"ga-lauf","name":"Lockerer Lauf oder Rad","sets":1,"repsMin":30,"repsMax":40,"unit":"Min","load":"km","perSide":false,"restSec":60,"restMax":null,"step":1,"note":"Minuten und optional Kilometer eintragen. Laufen oder Rad in den Notizen festhalten."}]},{"id":"fb-b","name":"Full Body B","kind":"kraft","weekday":2,"focus":"Einseitige Kraft, Oberkörper und Stabilität","duration":"50–60 Min.","note":"Schwerpunkt: Gleichgewicht, Beine, Schultern und Rumpf.","exercises":[{"id":"rev-lunge","name":"Reverse Lunge mit Kurzhanteln","sets":3,"repsMin":8,"repsMax":8,"unit":"Wdh","load":"kg","perSide":true,"restSec":90,"restMax":null,"step":2,"note":"Einseitige Beinkraft und Kontrolle. Erst mit Körpergewicht (0 kg), dann mit Zusatzgewicht, wenn du stabil bleibst.","anim":"lunge"},{"id":"kb-rdl","name":"Kettlebell Romanian Deadlift","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":null,"step":4,"note":"Hüfte nach hinten schieben, Gewichte nah am Körper. Dehnung hinten im Oberschenkel spüren.","anim":"rdl"},{"id":"hk-press","name":"Halb kniender Kettlebell Overhead Press","sets":3,"repsMin":6,"repsMax":8,"unit":"Wdh","load":"kg","perSide":true,"restSec":60,"restMax":90,"step":2,"note":"Kontrolliert über Kopf drücken, nicht ins Hohlkreuz ausweichen.","alt":"Zunächst mit einer Kurzhantel üben.","anim":"hkpress"},{"id":"latzug","name":"Latzug","sets":3,"repsMin":8,"repsMax":12,"unit":"Wdh","load":"kg","perSide":false,"restSec":90,"restMax":null,"step":2.5,"note":"Vertikale Zugbewegung für Rücken und Arme.","anim":"latpull"},{"id":"pallof","name":"Pallof Press am Kabelzug","sets":3,"repsMin":10,"repsMax":10,"unit":"Wdh","load":"kg","perSide":true,"restSec":45,"restMax":60,"step":2.5,"note":"Oberkörper ruhig halten, Kabel nach vorne drücken. Anti-Rotation.","anim":"pallof"}]},{"id":"erholung","name":"Erholung","kind":"erholung","weekday":3,"focus":"Aktive Regeneration","duration":"10–15 Min.","note":"Spaziergang oder 10–15 Minuten Mobility für Hüfte, Sprunggelenke und Brustwirbelsäule.","exercises":[{"id":"mobility","name":"Spaziergang oder Mobility","sets":1,"repsMin":10,"repsMax":15,"unit":"Min","load":"none","perSide":false,"restSec":60,"restMax":null,"step":1,"note":""}]},{"id":"fb-c","name":"Full Body C","kind":"kraft","weekday":4,"focus":"Ganzkörper, Power und Conditioning","duration":"45–60 Min.","note":"Schwerpunkt: Kraft, Power und kontrollierte Belastbarkeit.","exercises":[{"id":"kb-clean","name":"Kettlebell Clean zur Rack-Position","sets":3,"repsMin":5,"repsMax":5,"unit":"Wdh","load":"kg","perSide":true,"restSec":60,"restMax":90,"step":4,"note":"Erst den Clean ohne anschließendes Drücken üben. Die Kettlebell soll kontrolliert in die Rack-Position kommen, nicht auf den Unterarm schlagen.","alt":"Kettlebell Deadlift, 3 × 10.","anim":"clean","altAnim":"kbdl"},{"id":"trapbar","name":"Trap-Bar Deadlift","sets":3,"repsMin":5,"repsMax":5,"unit":"Wdh","load":"kg","perSide":false,"restSec":120,"restMax":null,"step":5,"note":"Moderates Gewicht. Jeden Satz mit sauberer Technik und etwas Reserve beenden.","anim":"trapbar"},{"id":"liegestuetz","name":"Liegestütze","sets":3,"repsMin":8,"repsMax":15,"unit":"Wdh","load":"none","perSide":false,"restSec":60,"restMax":90,"step":1,"note":"Körper und Rumpf stabil. Wenn 15 Wiederholungen leicht sind, die Variante schrittweise erschweren (Variante in den Notizen festhalten).","anim":"pushup"},{"id":"kabelrudern","name":"Sitzendes Kabelrudern","sets":3,"repsMin":10,"repsMax":12,"unit":"Wdh","load":"kg","perSide":false,"restSec":75,"restMax":90,"step":2.5,"note":"Kontrolliert ziehen, kein Schwung aus dem Oberkörper.","anim":"cablerow"},{"id":"suitcase","name":"Suitcase Carry","sets":3,"repsMin":30,"repsMax":30,"unit":"m","load":"kg","perSide":true,"restSec":45,"restMax":60,"step":4,"note":"Eine Kettlebell nur auf einer Seite. Aufrecht bleiben, nicht zur Last kippen.","anim":"suitcase"}]},{"id":"cardio-2","name":"Cardio 2","kind":"cardio","weekday":5,"focus":"Längere Ausdauereinheit","duration":"40–60 Min.","note":"Radfahren, lockeres Laufen oder eine andere Ausdaueraktivität, überwiegend moderat. Wenn du müde bist, Dauer oder Intensität reduzieren.","exercises":[{"id":"ga-lang","name":"Rad oder lockerer Lauf","sets":1,"repsMin":40,"repsMax":60,"unit":"Min","load":"km","perSide":false,"restSec":60,"restMax":null,"step":1,"note":"Minuten und optional Kilometer eintragen."}]}]};
   const STORE_KEY = "eisenbuch:v1";
   const WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
   const WD_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
@@ -282,7 +452,8 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     set(k, v) { try { localStorage.setItem("eisenbuch:pref:" + k, JSON.stringify(v)); } catch {} },
   };
 
-  const S = { tab: "heute", selDate: isoDate(new Date()), override: {}, histEx: null, nav: [], openNotes: {}, confirm: null, sheet: null };
+  const S = { tab: "heute", selDate: isoDate(new Date()), override: {}, histEx: null, nav: [], openNotes: {}, altShown: {}, confirm: null, sheet: null };
+  const FREE = { id: "frei", name: "Freies Training", kind: "kraft", focus: "Eigene Übungen", duration: "", exercises: [] };
 
   // ---------- helpers ----------
   function isoDate(d) { const z = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()); }
@@ -318,14 +489,17 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
   const days = () => (DB.plan && Array.isArray(DB.plan.days)) ? DB.plan.days : [];
   const dayIndex = id => days().findIndex(d => d.id === id);
   function sessionsList() { return Object.entries(DB.sessions).map(([id, s]) => ({ id, ...s })).sort((a, b) => b.date.localeCompare(a.date)); }
+  const dayById = id => id === FREE.id ? FREE : days().find(d => d.id === id) || null;
+  const plannedFor = ds => days().find(d => d.weekday === wdIndex(parseIso(ds))) || null;
+  // what is shown for a date: manual choice, else something already logged, else the weekday schedule
   function dayForDate(ds) {
     if (S.override[ds] === "__none") return null;
-    if (S.override[ds]) return days().find(d => d.id === S.override[ds]) || null;
-    const logged = Object.values(DB.sessions).find(s => s.date === ds && isMeaningful(s));
-    if (logged) { const d = days().find(x => x.id === logged.dayId); if (d) return d; }
-    const wd = wdIndex(parseIso(ds));
-    return days().find(d => d.weekday === wd) || null;
+    if (S.override[ds]) return dayById(S.override[ds]);
+    const logged = Object.values(DB.sessions).filter(s => s.date === ds && isMeaningful(s)).sort((a, b) => (b.touched || "").localeCompare(a.touched || ""));
+    for (const l of logged) { const d = dayById(l.dayId); if (d) return d; }
+    return plannedFor(ds);
   }
+  function loggedDays(ds) { return [...new Set(Object.values(DB.sessions).filter(s => s.date === ds && isMeaningful(s)).map(s => s.dayId))].map(dayById).filter(Boolean); }
   function planExByName(name) { const k = key(name); for (const d of days()) for (const e of d.exercises || []) if (key(e.name) === k) return e; return null; }
   function programWeek(ds) {
     const p = DB.plan && DB.plan.program; if (!p || !p.start) return null;
@@ -365,6 +539,54 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     return { w: top, r: U(ex) === "Wdh" ? Math.min(max || 99, Math.max(...topSets.map(s => s.r)) + 1) : max };
   }
 
+  // ---------- exercise figures ----------
+  const GUESS = [[/swing/, "swing"], [/goblet|kniebeug|squat/, "goblet"], [/bankdr|bench/, "bench"], [/kabel.*ruder|cable row/, "cablerow"], [/ruder|row/, "row"],
+    [/farmer/, "farmer"], [/suitcase/, "suitcase"], [/lunge|ausfallschritt/, "lunge"], [/rumän|rdl|romanian/, "rdl"], [/trap/, "trapbar"],
+    [/kettlebell.*(deadlift|kreuzheb)/, "kbdl"], [/kreuzheb|deadlift/, "trapbar"], [/overhead|schulterdr|press über|military/, "hkpress"],
+    [/latzug|pulldown|klimmz/, "latpull"], [/pallof/, "pallof"], [/clean|umsetzen/, "clean"], [/liegest|push.?up/, "pushup"]];
+  function animFor(ex) {
+    if (typeof FIG === "undefined") return null;
+    if (ex.anim === "none") return null;
+    if (ex.anim && FIG.D[ex.anim]) return ex.anim;
+    const n = key(ex.name); for (const [re, k] of GUESS) if (re.test(n)) return k;
+    return null;
+  }
+  function figSvg(k, frame, cls, live) {
+    const d = FIG.D[k];
+    return `<svg class="fig ${cls}" viewBox="0 0 220 170" aria-hidden="true"${live ? ` data-anim="${k}"` : ""}>${FIG.draw(d, d.frames[frame])}</svg>`;
+  }
+  function techPanel(ex) {
+    const open = !!S.openNotes[ex.id];
+    const base = animFor(ex), alt = ex.altAnim && FIG.D[ex.altAnim] ? ex.altAnim : null;
+    const k = S.altShown[ex.id] && alt ? alt : base;
+    const video = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + " Technik")}`;
+    const head = `<button type="button" class="tech ${open ? "open" : ""}" data-act="note" data-ex="${esc(ex.id)}" aria-expanded="${open}">
+      ${base ? figSvg(base, 1, "mini") : ""}<span class="tx">${esc(ex.note || "Technik ansehen")}</span><span class="chev">›</span></button>`;
+    if (!open) return head;
+    return `<div class="techp">${head}
+      ${k ? figSvg(k, 0, "big", true) + `<div class="figcap">${esc(FIG.D[k].label)}${k === alt ? " (Einstiegsvariante)" : ""}</div>` : ""}
+      ${ex.alt ? `<div class="alt">Technik sitzt noch nicht? ${esc(ex.alt)}${alt ? ` <button class="link" type="button" data-act="alt-anim" data-ex="${esc(ex.id)}" style="padding:0 0 0 4px">${S.altShown[ex.id] ? "Hauptübung zeigen" : "Zeigen"}</button>` : ""}</div>` : ""}
+      <div class="row"><a class="link" href="${video}" target="_blank" rel="noopener">Video-Anleitung ansehen ↗</a></div></div>`;
+  }
+  let animRAF = null, animLast = 0;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function animate(ts) {
+    animRAF = null;
+    const figs = document.querySelectorAll("svg[data-anim]");
+    if (!figs.length || typeof FIG === "undefined") return;
+    if (ts - animLast > 33) {
+      animLast = ts;
+      const period = 2600, ph = (ts % period) / period;
+      // ease in-out ping-pong with a short hold at both ends
+      const tri = ph < .5 ? ph * 2 : 2 - ph * 2;
+      const hold = Math.min(1, Math.max(0, (tri - .1) / .8));
+      const k = reduceMotion ? 1 : hold * hold * (3 - 2 * hold);
+      figs.forEach(svg => { const d = FIG.D[svg.dataset.anim]; svg.innerHTML = FIG.draw(d, FIG.mix(d.frames[0], d.frames[1], k)); });
+    }
+    animRAF = requestAnimationFrame(animate);
+  }
+  function startAnim() { if (!animRAF) animRAF = requestAnimationFrame(animate); }
+
   // ---------- sessions ----------
   function isMeaningful(s) { return !!(s && (s.finishedAt || s.notes || (s.entries || []).some(e => e.sets.some(x => x.done || x.w != null || x.r != null)))); }
   function getSession(ds, day) {
@@ -372,7 +594,7 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     if (!DB.sessions[id]) DB.sessions[id] = { date: ds, dayId: day.id, dayName: day.name, entries: [], notes: "", finishedAt: null };
     const s = DB.sessions[id];
     const pw = programWeek(ds), deload = pw && pw.phase && pw.phase.deload;
-    for (const ex of day.exercises || []) {
+    for (const ex of exList(day, s)) {
       let e = s.entries.find(x => x.exId === ex.id) || s.entries.find(x => key(x.name) === key(ex.name));
       if (!e) {
         e = { exId: ex.id, name: ex.name, unit: U(ex), load: LD(ex), sets: [] }; s.entries.push(e);
@@ -383,6 +605,8 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     }
     return { id, s };
   }
+  function exList(day, s) { return [...(day.exercises || []), ...((s && s.extras) || [])]; }
+  function touch(s) { s.touched = new Date().toISOString(); }
   function entryOf(s, ex) { return s.entries.find(x => x.exId === ex.id) || s.entries.find(x => key(x.name) === key(ex.name)); }
 
   // ---------- render ----------
@@ -394,6 +618,7 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     v.innerHTML = S.tab === "heute" ? renderToday() : S.tab === "verlauf" ? renderHistory() : renderPlan();
     if (S.tab === "verlauf") wireChart();
     renderSheet();
+    startAnim();
   }
   function keepScroll(fn) { const y = window.scrollY; fn(); window.scrollTo(0, y); }
 
@@ -424,9 +649,11 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     const day = dayForDate(ds);
     const pw = programWeek(ds);
     const phasePill = pw ? `<button class="pill phase" type="button" data-act="open-phase">${pw.week < 1 ? "Start " + fmtShort(pw.program.start) : pw.week > pw.weeks ? "Block beendet" : `<b class="num">W${pw.week}</b> ${esc(pw.phase ? pw.phase.title : "")}`}<span class="chev">›</span></button>` : "";
-    const opts = days().map(x => `<option value="${esc(x.id)}" ${day && x.id === day.id ? "selected" : ""}>${esc(x.name)}${x.weekday >= 0 ? " (" + WD[x.weekday] + ")" : ""}</option>`).join("");
-    const switcher = days().length ? `<span class="pill">Wechseln<span class="chev">▾</span><select id="day-pick" data-act="pick-day" aria-label="Einheit wählen"><option value="">Ruhetag</option>${opts}</select></span>` : "";
-    const pills = `<div class="pills">${phasePill}${switcher}</div>`;
+    const switcher = `<button class="pill" type="button" data-act="open-switch">Andere Einheit<span class="chev">›</span></button>`;
+    const onDate = loggedDays(ds);
+    if (day && !onDate.some(x => x.id === day.id)) onDate.push(day);
+    const seg = onDate.length > 1 ? `<div class="seg"><span class="lbl">An diesem Tag:</span>${onDate.map(x => `<button type="button" data-act="pick-unit" data-id="${esc(x.id)}" aria-pressed="${day && x.id === day.id}">${esc(x.name)}</button>`).join("")}</div>` : "";
+    const pills = `<div class="pills">${phasePill}${switcher}</div>${seg}`;
 
     if (!days().length) return `<div class="head"><div class="eyebrow">${dateLabel}</div><h1 class="title">Kein Plan</h1></div>${installHint()}
       <div class="empty"><h3>Noch keine Einheiten</h3><div>Lege im Tab Plan deine Einheiten an.</div></div>`;
@@ -437,12 +664,14 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
       return `<div class="head"><div class="eyebrow">${dateLabel}</div><h1 class="title">Ruhetag</h1>
         ${next ? `<div class="sub">Als Nächstes: ${esc(next.x.name)} am ${WD_LONG[next.w]}</div>` : ""}</div>
         ${installHint()}${pills}
-        <div class="empty"><h3>Regeneration</h3><div>Dein Körper passt sich in der Pause an. Wenn du trotzdem trainieren willst, tippe auf Wechseln.</div></div>`;
+        <div class="empty"><h3>Regeneration</h3><div>Dein Körper passt sich in der Pause an. Wenn du trotzdem trainieren willst, tippe auf „Andere Einheit“.</div></div>`;
     }
 
     const { id, s } = getSession(ds, day);
     let total = 0, done = 0, vol = 0, mins = 0;
-    const cards = (day.exercises || []).map((ex, n) => {
+    const extras = s.extras || [];
+    const cards = exList(day, s).map((ex, n) => {
+      const isExtra = extras.includes(ex);
       const e = entryOf(s, ex), l = LD(ex), u = U(ex), hasLoad = l !== "none";
       const last = lastFor(ex.name, ds), sug = suggestion(ex, last), prev = bestScore(ex, ds);
       let best = 0;
@@ -470,15 +699,13 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
       const lblL = l === "kg" ? "kg" : "km";
       const lblR = (u === "Wdh" ? "Wdh" : u) + (ex.perSide ? " / Seite" : "");
       const labels = hasLoad ? (l === "km" ? `<span></span><span>min</span><span>km</span><span></span>` : `<span></span><span>${lblL}</span><span>${lblR}</span><span></span>`) : `<span></span><span>${lblR}</span><span></span>`;
-      const noteOpen = S.openNotes[ex.id];
       return `<section class="ex ${complete ? "complete" : ""}">
-        <div class="ex-head"><h2 class="ex-name"><span class="i">${complete ? "✓" : n + 1}</span>${esc(ex.name)}</h2>
+        <div class="ex-head"><h2 class="ex-name"><span class="i">${complete ? "✓" : n + 1}</span><span>${esc(ex.name)}${isExtra ? `<span class="extra-tag">nur heute</span>` : ""}</span></h2>
           <div class="ex-target">${ex.sets}×${range(ex.repsMin, ex.repsMax)}${unitShort(ex)}${ex.perSide ? "<small>pro Seite</small>" : ""}</div></div>
-        ${ex.note ? `<button type="button" class="ex-note ${noteOpen ? "open" : ""}" data-act="note" data-ex="${esc(ex.id)}">${esc(ex.note)}</button>` : ""}
-        ${ex.alt && noteOpen ? `<div class="alt">Technik sitzt noch nicht? ${esc(ex.alt)}</div>` : ""}
+        ${techPanel(ex)}
         ${lastLine || chip ? `<div class="last">${lastLine}${chip}</div>` : ""}
         <div class="sets"><div class="srow lbl ${hasLoad ? "" : "one"}">${labels}</div>${rows}</div>
-        <div class="ex-foot"><span>${isKraft(day) ? "Pause " + restText(ex) : ""}</span>
+        <div class="ex-foot"><span>${isExtra ? `<button class="link danger" type="button" data-act="extra-del" data-ex="${esc(ex.id)}" style="padding-left:0">Entfernen</button>` : isKraft(day) ? "Pause " + restText(ex) : ""}</span>
           <span><button class="link muted" type="button" data-act="del-set" data-ex="${esc(ex.id)}" aria-label="Satz entfernen">− Satz</button> <button class="link" type="button" data-act="add-set" data-ex="${esc(ex.id)}">+ Satz</button></span></div>
       </section>`;
     }).join("");
@@ -487,8 +714,10 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     const kraft = isKraft(day);
     const third = kraft ? `<div class="stat"><div class="v num">${Math.round(vol).toLocaleString("de-DE")}</div><div class="k">kg bewegt</div></div>`
       : `<div class="stat"><div class="v num">${fmt(mins)}<small> min</small></div><div class="k">Dauer</div></div>`;
+    const pwk = pw && pw.week >= 1 && pw.week <= pw.weeks ? pw.week : null;
     const stats = `<div class="stats"><div class="stat hi"><div class="v num">${done}<small>/${total}</small></div><div class="k">Sätze</div></div>${third}
-      <div class="stat"><div class="v num">${esc(day.duration ? day.duration.replace(/\s*Min\.?/, "") : "–")}<small>${day.duration ? " min" : ""}</small></div><div class="k">geplant</div></div></div>
+      ${day.duration ? `<div class="stat"><div class="v num">${esc(day.duration.replace(/\s*Min\.?/, ""))}<small> min</small></div><div class="k">geplant</div></div>`
+        : `<div class="stat"><div class="v num">${pwk ? pwk + "<small>/" + pw.weeks + "</small>" : "–"}</div><div class="k">Woche</div></div>`}</div>
       <div class="bar" aria-hidden="true"><i style="width:${pct}%"></i></div>`;
     const summary = s.finishedAt ? `<section class="summary"><div class="eyebrow" style="color:var(--accent)">Einheit abgeschlossen</div>
       <div class="stats"><div class="stat"><div class="v num">${done}</div><div class="k">Sätze</div></div>
@@ -500,7 +729,8 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
     return `<div class="head"><div class="eyebrow">${dateLabel}</div><h1 class="title">${esc(day.name)}</h1>
         <div class="${KIND_CLASS[day.kind || "kraft"]}"><span class="tag">${esc(sub || KINDS[day.kind || "kraft"])}</span></div>
         ${day.note && !kraft ? `<div class="sub">${esc(day.note)}</div>` : ""}</div>
-      ${installHint()}${summary}${stats}${pills}${deload}${cards}
+      ${installHint()}${summary}${stats}${pills}${deload}${cards || `<div class="empty"><h3>Noch keine Übungen</h3><div>Füge hinzu, was du heute machst. Gewicht und Wiederholungen trägst du danach wie gewohnt ein.</div></div>`}
+      <button class="addex" type="button" data-act="open-addex">＋ Übung hinzufügen</button>
       <div class="section-t">Notizen</div>
       <textarea id="notes-${id}" data-act="notes" placeholder="${kraft ? "Kettlebell-Gewicht, Technik, Energie …" : "Laufen oder Rad? Strecke, Puls, Gefühl …"}">${esc(s.notes || "")}</textarea>
       <button class="big ${s.finishedAt ? "ghost" : ""}" type="button" data-act="finish">${s.finishedAt ? "Wieder öffnen" : "Einheit abschließen"}</button>`;
@@ -518,8 +748,11 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
   }
 
   // ---------- bottom sheet (phase + rules) ----------
+  function sheetWrap(label, inner) { return `<div class="sheet-bg" data-act="close-sheet"></div><div class="sheet" role="dialog" aria-modal="true" aria-label="${label}"><div class="grab"></div><div class="in">${inner}</div></div>`; }
   function renderSheet() {
     const root = document.getElementById("sheet-root");
+    if (S.sheet === "switch") { root.innerHTML = sheetWrap("Einheit wählen", switchSheet()); return; }
+    if (S.sheet === "addex") { if (!root.querySelector("#addex-name")) root.innerHTML = sheetWrap("Übung hinzufügen", addexSheet()); return; }
     if (S.sheet !== "phase") { root.innerHTML = ""; return; }
     const pw = programWeek(S.selDate); if (!pw) { root.innerHTML = ""; return; }
     const p = pw.program;
@@ -534,6 +767,52 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
       ${phases ? `<ul>${phases}</ul>` : ""}
       ${rules ? `<div class="section-t">Regeln</div><ul>${rules}</ul>` : ""}
       <button class="big ghost" type="button" data-act="close-sheet">Schließen</button></div></div>`;
+  }
+
+  function switchSheet() {
+    const ds = S.selDate, cur = dayForDate(ds), planned = plannedFor(ds), logged = new Set(loggedDays(ds).map(d => d.id));
+    const sorted = days().slice().sort((a, b) => (a.weekday < 0 ? 9 : a.weekday) - (b.weekday < 0 ? 9 : b.weekday));
+    const row = (id, l, name, sub, cls = "") => `<button class="li ${cls}" type="button" data-act="pick-unit" data-id="${esc(id)}"><span class="l">${l}</span><span class="m">${name}${sub ? `<small>${sub}</small>` : ""}</span><span class="r">${cur && cur.id === id ? "✓" : logged.has(id) ? "eingetragen" : planned && planned.id === id ? "geplant" : ""}</span></button>`;
+    return `<div class="eyebrow">${WD_LONG[wdIndex(parseIso(ds))]} · ${fmtShort(ds)}</div><h2>Was trainierst du?</h2>
+      <div class="list">${sorted.map(d => row(d.id, d.weekday >= 0 ? WD[d.weekday] : "flex", esc(d.name), `<span class="${KIND_CLASS[d.kind || "kraft"]}"><span class="tag" style="font-weight:500">${esc(d.focus || KINDS[d.kind || "kraft"])}</span></span>`)).join("")}
+        ${row(FREE.id, "＋", "Freies Training", "Übungen selbst zusammenstellen")}
+        ${row("__none", "–", "Ruhetag", "")}</div>
+      <div class="foot-note">Dein Wochenplan bleibt gleich. Die Einheit gilt nur für diesen Tag, und du kannst mehrere Einheiten am selben Tag eintragen.</div>
+      <button class="big ghost" type="button" data-act="close-sheet">Abbrechen</button>`;
+  }
+  function addexSheet() {
+    const day = dayForDate(S.selDate); if (!day) return "";
+    const { s } = getSession(S.selDate, day);
+    const have = new Set(exList(day, s).map(x => key(x.name)));
+    const lib = new Map();
+    for (const d of days()) for (const e of d.exercises || []) if (!have.has(key(e.name)) && !lib.has(key(e.name))) lib.set(key(e.name), e);
+    for (const x of Object.values(DB.sessions)) for (const e of x.extras || []) if (!have.has(key(e.name)) && !lib.has(key(e.name))) lib.set(key(e.name), e);
+    const libRows = [...lib.entries()].map(([k, e]) => `<button class="li" type="button" data-act="addex-pick" data-key="${esc(k)}"><span class="l">${animFor(e) ? figSvg(animFor(e), 1, "mini") : ""}</span><span class="m">${esc(e.name)}<small class="num">${e.sets}×${range(e.repsMin, e.repsMax)}${unitShort(e)}${e.perSide ? " pro Seite" : ""}</small></span><span class="r" style="color:var(--accent)">＋</span></button>`).join("");
+    const perm = day.id !== FREE.id ? `<div class="list"><div class="frow"><span>Dauerhaft in „${esc(day.name)}“</span><label class="switch"><input type="checkbox" id="addex-perm" aria-label="Dauerhaft in den Plan übernehmen"><i></i></label></div></div>
+      <div class="foot-note">Aus: nur für heute. An: kommt ab jetzt jedes Mal in dieser Einheit.</div>` : "";
+    return `<h2>Übung hinzufügen</h2>${perm}
+      <div class="section-t">Neue Übung</div><div class="list">
+        <label class="frow"><span>Name</span><input id="addex-name" placeholder="z. B. Bizepscurls" autocomplete="off"></label>
+        <label class="frow"><span>Sätze</span><input id="addex-sets" inputmode="numeric" value="3"></label>
+        <label class="frow"><span>Bereich von</span><input id="addex-min" inputmode="decimal" value="8"></label>
+        <label class="frow"><span>bis</span><input id="addex-max" inputmode="decimal" value="12"></label>
+        <label class="frow"><span>Einheit</span><select id="addex-unit">${sel(UNITS, "Wdh")}</select></label>
+        <label class="frow"><span>Last</span><select id="addex-load">${sel(LOADS, "kg")}</select></label>
+        <div class="frow"><span>Pro Seite</span><label class="switch"><input type="checkbox" id="addex-side" aria-label="Pro Seite"><i></i></label></div></div>
+      <button class="big" type="button" data-act="addex-new">Hinzufügen</button>
+      ${libRows ? `<div class="section-t">Oder aus deinen Übungen</div><div class="list">${libRows}</div>` : ""}
+      <button class="big ghost" type="button" data-act="close-sheet">Abbrechen</button>`;
+  }
+  function addExercise(def) {
+    const day = dayForDate(S.selDate); if (!day) return;
+    const { s } = getSession(S.selDate, day);
+    const perm = document.getElementById("addex-perm");
+    const ex = { ...clone(def), id: uid() };
+    if (perm && perm.checked && day.id !== FREE.id) { day.exercises.push(ex); toast("Zum Plan hinzugefügt"); }
+    else { (s.extras ||= []).push(ex); toast("Für heute hinzugefügt"); }
+    touch(s); getSession(S.selDate, day); saveSoon();
+    S.sheet = null; render();
+    requestAnimationFrame(() => { const el = document.getElementById(`w-${S.selDate}_${day.id}-${ex.id}-0`) || document.getElementById(`r-${S.selDate}_${day.id}-${ex.id}-0`); if (el) el.scrollIntoView({ block: "center", behavior: "smooth" }); });
   }
 
   // ---------- history ----------
@@ -703,6 +982,8 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
         ${frow("Steigerung (kg)", "ex.step", e.step, "decimal")}</div>
       <div class="foot-note">Schaffst du in allen Sätzen das obere Ende des Bereichs, schlägt die App beim nächsten Mal die Steigerung vor.</div>
       <div class="section-t">Hinweise</div><div class="list">
+        <label class="frow"><span>Animation</span><select id="f-ex-anim" data-bind="ex.anim"><option value="" ${!e.anim ? "selected" : ""}>Automatisch</option><option value="none" ${e.anim === "none" ? "selected" : ""}>Keine</option>${typeof FIG !== "undefined" ? Object.entries(FIG.D).map(([k, d]) => `<option value="${k}" ${e.anim === k ? "selected" : ""}>${esc(d.label)}</option>`).join("") : ""}</select></label>
+        ${animFor(e) ? `<div style="padding:4px 14px 12px">${figSvg(animFor(e), 0, "big", true)}</div>` : ""}
         <label class="frow stack"><span>Technik</span><textarea id="f-ex-note" data-bind="ex.note">${esc(e.note || "")}</textarea></label>
         <label class="frow stack"><span>Alternative, solange die Technik nicht sitzt</span><input id="f-ex-alt" data-bind="ex.alt" value="${esc(e.alt || "")}" placeholder="optional"></label></div>
       <div class="list">${c && c.t === "ex-del" ? `<div class="confirm">Übung entfernen? <button class="link muted" type="button" data-act="cancel">Abbrechen</button><button class="link danger" type="button" data-act="ex-del-yes">Entfernen</button></div>`
@@ -795,9 +1076,34 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
       case "open-phase": S.sheet = "phase"; renderSheet(); return;
       case "close-sheet": S.sheet = null; renderSheet(); return;
       case "note": S.openNotes[t.dataset.ex] = !S.openNotes[t.dataset.ex]; keepScroll(render); return;
+      case "alt-anim": S.altShown[t.dataset.ex] = !S.altShown[t.dataset.ex]; keepScroll(render); return;
+      case "open-switch": S.sheet = "switch"; renderSheet(); return;
+      case "pick-unit": S.override[S.selDate] = t.dataset.id; S.sheet = null; render(); window.scrollTo(0, 0); return;
+      case "open-addex": S.sheet = "addex"; renderSheet(); setTimeout(() => document.getElementById("addex-name")?.focus(), 250); return;
+      case "addex-new": {
+        const name = document.getElementById("addex-name").value.trim();
+        if (!name) { toast("Gib der Übung einen Namen"); document.getElementById("addex-name").focus(); return; }
+        const mn = num(document.getElementById("addex-min").value) ?? 8;
+        addExercise({ name, sets: Math.max(1, Math.min(12, parseInt(document.getElementById("addex-sets").value) || 3)), repsMin: mn, repsMax: Math.max(num(document.getElementById("addex-max").value) ?? mn, mn),
+          unit: document.getElementById("addex-unit").value, load: document.getElementById("addex-load").value, perSide: document.getElementById("addex-side").checked,
+          restSec: 90, restMax: null, step: 2.5, note: "", alt: "" });
+        return;
+      }
+      case "addex-pick": {
+        const k = t.dataset.key; let def = null;
+        for (const d of days()) for (const e of d.exercises || []) if (!def && key(e.name) === k) def = e;
+        for (const x of Object.values(DB.sessions)) for (const e of x.extras || []) if (!def && key(e.name) === k) def = e;
+        if (def) addExercise(def); return;
+      }
+      case "extra-del": {
+        const c = today(); if (!c) return;
+        const ex = (c.s.extras || []).find(x => x.id === t.dataset.ex); if (!ex) return;
+        c.s.extras = c.s.extras.filter(x => x !== ex); c.s.entries = c.s.entries.filter(e => e.exId !== ex.id);
+        touch(c.s); saveSoon(); keepScroll(render); return;
+      }
       case "toggle": case "add-set": case "del-set": {
         const c = today(); if (!c) return;
-        const ex = c.day.exercises.find(x => x.id === t.dataset.ex), e = entryOf(c.s, ex);
+        const ex = exList(c.day, c.s).find(x => x.id === t.dataset.ex), e = entryOf(c.s, ex); touch(c.s);
         if (a === "toggle") {
           const i = +t.dataset.i, st = e.sets[i];
           if (!st.done) {
@@ -808,7 +1114,7 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
             const missW = LD(ex) === "kg" && st.w == null;
             if (missW || st.r == null) { toast(missW ? "Trag zuerst das Gewicht ein" : "Trag zuerst den Wert ein"); document.getElementById(`${missW ? "w" : "r"}-${c.id}-${ex.id}-${i}`)?.focus(); return; }
             st.done = true;
-            const more = e.sets.some(x => !x.done) || c.day.exercises.some(x => x.id !== ex.id && entryOf(c.s, x).sets.some(y => !y.done));
+            const more = e.sets.some(x => !x.done) || exList(c.day, c.s).some(x => x.id !== ex.id && entryOf(c.s, x).sets.some(y => !y.done));
             if (isKraft(c.day) && more) startTimer(ex.restSec || 90, `${ex.name} · Satz ${i + 1}`);
             keepAwake();
           } else st.done = false;
@@ -861,14 +1167,14 @@ nav.tabbar button[aria-selected="true"] { color: var(--accent); }
       const day = dayForDate(S.selDate); if (!day) return;
       const { s } = getSession(S.selDate, day);
       if (t.dataset.act === "notes") s.notes = t.value;
-      else { const ex = day.exercises.find(x => x.id === t.dataset.ex), st = entryOf(s, ex).sets[+t.dataset.i]; st[t.dataset.act === "set-w" ? "w" : "r"] = num(t.value); }
+      else { const ex = exList(day, s).find(x => x.id === t.dataset.ex), st = entryOf(s, ex).sets[+t.dataset.i]; st[t.dataset.act === "set-w" ? "w" : "r"] = num(t.value); }
+      touch(s);
       saveSoon();
     }
   });
   document.addEventListener("change", ev => {
     const t = ev.target;
     if (t.dataset.bind && (t.tagName === "SELECT" || t.type === "checkbox" || t.type === "date")) { applyBind(t); keepScroll(render); return; }
-    if (t.dataset.act === "pick-day") { S.override[S.selDate] = t.value || "__none"; render(); return; }
     if (t.dataset.act === "hist-ex") { S.histEx = t.value; render(); return; }
   });
   // "Enter" on the number pad jumps to the next field
